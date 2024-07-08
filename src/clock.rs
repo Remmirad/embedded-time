@@ -4,7 +4,7 @@ use crate::{
     duration::Duration, fixed_point::FixedPoint, fraction::Fraction, instant::Instant,
     time_int::TimeInt, timer::param, timer::Timer,
 };
-use core::hash::Hash;
+use core::{future::Future, hash::Hash};
 
 /// Potential `Clock` errors
 #[non_exhaustive]
@@ -46,6 +46,29 @@ pub trait Clock: Sized {
     /// - [`Error::NotRunning`]
     /// - [`Error::Unspecified`]
     fn try_now(&self) -> Result<Instant<Self>, Error>;
+
+    /// Spawn a new, `OneShot` [`Timer`] from this clock
+    fn new_timer<Dur: Duration>(
+        &self,
+        duration: Dur,
+    ) -> Timer<param::OneShot, param::Armed, Self, Dur>
+    where
+        Dur: FixedPoint,
+    {
+        Timer::<param::None, param::None, Self, Dur>::new(&self, duration)
+    }
+}
+
+pub trait AsyncClock: Clock {
+    /// Get the current Instant
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::NotRunning`]
+    /// - [`Error::Unspecified`]
+    fn try_now(&self) -> impl Future<Output = Result<Instant<Self>, Error>>;
+
+    fn try_wait(&self, ticks: Self::T) -> impl Future<Output = Result<(), Error>>;
 
     /// Spawn a new, `OneShot` [`Timer`] from this clock
     fn new_timer<Dur: Duration>(
